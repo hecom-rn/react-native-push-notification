@@ -41,8 +41,10 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import static com.dieam.reactnativepushnotification.modules.RNPushNotification.LOG_TAG;
 import static com.dieam.reactnativepushnotification.modules.RNPushNotificationAttributes.fromJson;
@@ -586,6 +588,13 @@ public class RNPushNotificationHelper {
                 } else {
                     notificationManager.notify(notificationID, info);
                 }
+                boolean canGroup = false;
+                if (bundle.containsKey("canGroup")) {
+                    canGroup = bundle.getBoolean("canGroup");
+                }
+                if (canGroup && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    updateNotificationSummary(info.getGroup(), channel_id, smallIconResId);
+                }
             }
 
             // Can't use setRepeating for recurring notifications because setRepeating
@@ -596,6 +605,67 @@ public class RNPushNotificationHelper {
         } catch (Exception e) {
             Log.e(LOG_TAG, "failed to send push notification", e);
         }
+    }
+
+    private static final int NOTIFICATION_GROUP_SUMMARY_ID = 1;
+    private static final Map<String, Integer> NOTIFICATION_SUMMARY_MAP = new HashMap<>();
+
+    private static int getSummaryId(String groupKey) {
+        if (NOTIFICATION_SUMMARY_MAP.containsKey(groupKey)) {
+            return NOTIFICATION_SUMMARY_MAP.get(groupKey);
+        }
+        int tmpValue = NOTIFICATION_SUMMARY_MAP.size() + 1;
+        NOTIFICATION_SUMMARY_MAP.put(groupKey, tmpValue);
+        return tmpValue;
+    }
+
+    protected void updateNotificationSummary(String group, String channelid, int icon) {
+        NotificationManager notificationManager = notificationManager();
+        int groupSummaryId = getSummaryId(group);
+        int numberOfNotifications = getNumberOfNotifications(group, groupSummaryId);
+        if (numberOfNotifications > 1) { //如果数量>=2,说明有了同样组key的通知，需要归类起来
+            //将通知添加/更新归类到同一组下面
+            String notificationContent = "summarycontent";
+            final NotificationCompat.Builder builder = new NotificationCompat.Builder(context)
+                    .setSmallIcon(icon)
+                    //添加富样式到通知的显示样式中，如果当前系统版本不支持，那么将不起作用，依旧用原来的通知样式
+                    .setStyle(new NotificationCompat.BigTextStyle()
+                            .setSummaryText(notificationContent))
+                    .setChannelId(channelid)
+                    .setGroup(group) //设置类组key，说明此条通知归属于哪一个归类
+                    .setGroupSummary(true); //这句话必须和上面那句一起调用，否则不起作用
+            final Notification notification = builder.build();
+            //发送通知到状态栏
+            //测试发现，发送归类状态栏也是算一条通知的。所以返回值得时候，需要-1
+            notificationManager.notify(groupSummaryId, notification);
+        } else {
+            //移除归类
+            notificationManager.cancel(groupSummaryId);
+        }
+    }
+
+    private int getNumberOfNotifications(String group, int groupSummaryId) {
+        NotificationManager notificationManager = notificationManager();
+        //查询当前展示的所有通知的状态列表
+        StatusBarNotification[] activeNotifications = new StatusBarNotification[0];
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            activeNotifications = notificationManager
+                    .getActiveNotifications();
+        }
+
+        int groupSize = 0;
+
+        for (StatusBarNotification notification : activeNotifications) {
+            Log.e("Group", "notification group = " + notification.getNotification().getGroup());
+            Log.e("Group", " group = " + group);
+            if (!Objects.equals(notification.getNotification().getGroup(), group)) {
+                continue;
+            }
+            if (notification.getId() != groupSummaryId) {
+                groupSize += 1;
+            }
+        }
+        return groupSize;
     }
 
     private void scheduleNextNotificationIfRepeating(Bundle bundle) {
