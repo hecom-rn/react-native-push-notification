@@ -95,18 +95,19 @@ Notifications.configure = function(options) {
       return;
     }
 
-    if (options.popInitialNotification === undefined || options.popInitialNotification === true) {
+    // harmony目前未实现getInitialNotification方法，所以添加Platform.OS !== 'harmony'判断，等以后鸿蒙支持该接口则可以去掉。
+    if ((options.popInitialNotification === undefined || options.popInitialNotification === true) && Platform.OS !== 'harmony') {
       this.popInitialNotification(function(firstNotification) {
         if(this.isPopInitialNotification) {
           return;
         }
-        
+
         this.isPopInitialNotification = true;
-        
+
         if (!firstNotification || false === firstNotification.userInteraction) {
           return;
         }
-        
+
         this._onNotification(firstNotification, true);
       }.bind(this));
     }
@@ -155,7 +156,7 @@ Notifications.localNotification = function({...details}) {
     }
   }
 
-  if (Platform.OS === 'ios') {
+  if (Platform.OS !== 'android') {
     // https://developer.apple.com/reference/uikit/uilocalnotification
 
     let soundName = details.soundName ? details.soundName : 'default'; // play sound (and vibrate) as default behaviour
@@ -210,7 +211,7 @@ Notifications.localNotification = function({...details}) {
     if(details.userInfo) {
       details.userInfo = JSON.stringify(details.userInfo);
     }
-  
+
     if(details.picture && !details.bigPictureUrl) {
       details.bigPictureUrl = details.picture;
     }
@@ -228,7 +229,7 @@ Notifications.localNotificationSchedule = function({...details}) {
   if ('android' === Platform.os && details && !details.channelId) {
     console.warn('No channel id passed, notifications may not work.');
   }
-  
+
   if (details && typeof details.id === 'number') {
     if(isNaN(details.id)) {
       console.warn('NaN value has been passed as id');
@@ -239,7 +240,7 @@ Notifications.localNotificationSchedule = function({...details}) {
     }
   }
 
-  if (Platform.OS === 'ios') {
+  if (Platform.OS !== 'android') {
     let soundName = details.soundName ? details.soundName : 'default'; // play sound (and vibrate) as default behaviour
 
     if (details.hasOwnProperty('playSound') && !details.playSound) {
@@ -250,7 +251,7 @@ Notifications.localNotificationSchedule = function({...details}) {
       details.userInfo = details.userInfo || {};
       details.userInfo.image = details.picture;
     }
-    
+
     const repeatsComponent = {
       second: ['minute', 'hour', 'day', 'week', 'month'].includes(details.repeatType),
       minute: ['hour', 'day', 'week', 'month'].includes(details.repeatType),
@@ -298,7 +299,7 @@ Notifications.localNotificationSchedule = function({...details}) {
         details.shortcutId = '' + details.shortcutId;
       }
     }
-  
+
     if(details && Array.isArray(details.actions)) {
       details.actions = JSON.stringify(details.actions);
     }
@@ -404,7 +405,7 @@ Notifications._transformNotificationObject = function(data, isFromBackground = n
         /* void */
       }
     }
-    
+
     if ( typeof _notification.userInfo === 'string' ) {
       try {
         _notification.userInfo = JSON.parse(_notification.userInfo);
@@ -449,8 +450,8 @@ Notifications._requestPermissions = function() {
     if ( this.isPermissionsRequestPending === false ) {
       this.isPermissionsRequestPending = true;
       return this.callNative( 'requestPermissions', [ this.permissions ])
-              .then(this._onPermissionResult.bind(this))
-              .catch(this._onPermissionResult.bind(this));
+          .then(this._onPermissionResult.bind(this))
+          .catch(this._onPermissionResult.bind(this));
     }
   } else if (Platform.OS === 'android') {
     return this.callNative( 'requestPermissions', []);
@@ -500,7 +501,7 @@ Notifications.cancelLocalNotification = function(notificationId) {
 
   if ( Platform.OS === 'ios' ) {
     return this.callNative('removePendingNotificationRequests', [[notificationId]]);
-  } else {
+  } else if (Platform.OS === 'android') {
     return this.callNative('cancelLocalNotification', [notificationId]);
   }
 };
@@ -559,7 +560,7 @@ Notifications.getScheduledLocalNotifications = function(callback) {
 	const mapNotifications = (notifications) => {
 		let mappedNotifications = [];
 		if(notifications?.length > 0) {
-			if(Platform.OS === 'ios'){
+          if(Platform.OS === 'ios'){
 				mappedNotifications = notifications.map(notif => {
 					return ({
 						soundName: notif?.sound,
@@ -596,7 +597,7 @@ Notifications.getScheduledLocalNotifications = function(callback) {
 
   if(Platform.OS === 'ios'){
     return this.callNative('getPendingNotificationRequests', [mapNotifications]);
-  } else {
+  } else if(Platform.OS === 'android') {
     return this.callNative('getScheduledLocalNotifications', [mapNotifications]);
   }
 }
