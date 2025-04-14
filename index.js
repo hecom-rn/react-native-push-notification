@@ -368,7 +368,7 @@ Notifications._transformNotificationObject = function(data, isFromBackground = n
 
   let _notification;
 
-  if ( Platform.OS === 'ios' ) {
+  if ( Platform.OS !== 'android' ) {
     const notifData = data.getData();
 
     _notification = {

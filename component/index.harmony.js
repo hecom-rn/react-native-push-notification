@@ -1,6 +1,6 @@
 "use strict";
 
-import PushNotificationHarmony from '@react-native-oh-tpl/push-notification-ios';
+import PushNotificationHarmony from '@react-native-ohos/push-notification-ios';
 
 module.exports = {
   component: PushNotificationHarmony
